@@ -19,7 +19,7 @@ contract BountyExchange {
     mapping(uint256 => BountyRequest) public bountyRequests;
 
     event RequestBounty(uint256 requestId);
-    event SubmitBounty(uint256 requestId);
+    event SubmitBounty(uint256 requestId, bool status);
 
     constructor() {}
 
@@ -51,7 +51,9 @@ contract BountyExchange {
             uint256,
             address,
             uint256,
-            address
+            address,
+            address,
+            bool
         )
     {
         BountyRequest storage bountyRequest = bountyRequests[requestID];
@@ -59,7 +61,9 @@ contract BountyExchange {
             bountyRequest.stolenAmount,
             bountyRequest.stolenToken,
             bountyRequest.bountyAmount,
-            bountyRequest.bountyToken
+            bountyRequest.bountyToken,
+            bountyRequest.bountyReceiver,
+            bountyRequest.bountyProcessed
         );
     }
 
@@ -136,7 +140,7 @@ contract BountyExchange {
         // Mark this request as processed.
         bountyRequest.bountyProcessed = true;
 
-        emit SubmitBounty(bountyRequestID);
+        emit SubmitBounty(bountyRequestID, bountyRequest.bountyProcessed);
         return bountyRequest.bountyProcessed;
     }
 }

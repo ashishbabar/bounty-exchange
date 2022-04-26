@@ -82,7 +82,11 @@ describe("BountyExchange", function () {
       .connect(bountyProvider)
       .approve(BountyExchange.address, bountyAmount);
 
-    await BountyExchange.connect(bountyProvider).submitBounty(bountyRequest);
+    const bountySubmissionTx = await BountyExchange.connect(
+      bountyProvider
+    ).submitBounty(bountyRequest);
+
+    const { events } = await bountySubmissionTx.wait();
 
     const bountyRequesterBalance = await bountyToken.balanceOf(
       bountyRequester.address
@@ -94,6 +98,13 @@ describe("BountyExchange", function () {
     );
     expect(bountyProviderBalance).to.equals(stolenAmount);
 
+    // Check if bounty request is processed.
+    bountyRequest = await BountyExchange.getBountyRequest(bountyRequest);
+    expect(bountyRequest[5]).to.equal(true);
+
     // Check event emitted
+    console.log('events :>> ', events);
+    const bountySubmissionEvent = events ? events[0].args : "";
+    console.log('bountySubmissionEvent :>> ', bountySubmissionEvent);
   });
 });
