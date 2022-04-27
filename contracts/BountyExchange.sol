@@ -2,12 +2,17 @@
 pragma solidity ^0.8.0;
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "hardhat/console.sol";
+import "@openzeppelin/contracts/utils/Timers.sol";
+import "@openzeppelin/contracts/utils/math/SafeCast.sol";
 
 /// @title A title that should describe the contract/interface
 /// @author ashishbabar
 /// @notice Explain to an end user what this does
 /// @dev Explain to a developer any extra details
 contract BountyExchange {
+    using Timers for Timers.Timestamp;
+    using SafeCast for uint256;
+
     struct BountyRequest {
         uint256 stolenAmount;
         uint256 bountyAmount;
@@ -15,6 +20,7 @@ contract BountyExchange {
         address bountyToken;
         address bountyReceiver;
         bool bountyProcessed;
+        Timers.Timestamp expirationTimestamp;
     }
     mapping(uint256 => BountyRequest) public bountyRequests;
 
@@ -72,7 +78,8 @@ contract BountyExchange {
         uint256 stolenAmount,
         address stolenToken,
         uint256 bountyAmount,
-        address bountyToken
+        address bountyToken,
+        uint256 duration
     ) public returns (uint256) {
         // TODO Check if stolenToken and bountyToken are ERC20 tokens.
         // Check stolen token allowance
@@ -91,6 +98,10 @@ contract BountyExchange {
             msg.sender
         );
 
+        // Calculate expiration timestamp from deadline
+        uint64 expirationTimestamp = block.timestamp.toUint64() +
+            duration.toUint64();
+
         // Initialize bounty request in storage
         BountyRequest storage bountyRequest = bountyRequests[requestID];
         bountyRequest.stolenAmount = stolenAmount;
@@ -99,6 +110,7 @@ contract BountyExchange {
         bountyRequest.bountyToken = bountyToken;
         bountyRequest.bountyReceiver = msg.sender;
         bountyRequest.bountyProcessed = false;
+        bountyRequest.expirationTimestamp.setDeadline(expirationTimestamp);
 
         IERC20(stolenToken).transferFrom(
             msg.sender,
@@ -115,6 +127,13 @@ contract BountyExchange {
     function submitBounty(uint256 bountyRequestID) public returns (bool) {
         BountyRequest storage bountyRequest = bountyRequests[bountyRequestID];
 
+        // Check if bounty request is expired
+        require(
+            bountyRequest.expirationTimestamp.getDeadline() >
+                block.timestamp.toUint64(),
+            "Bounty request expired!"
+        );
+
         // Retrieve tokens from bounty token contract
         uint256 approvedBountyAmount = IERC20(bountyRequest.bountyToken)
             .allowance(msg.sender, address(this));
@@ -128,6 +147,11 @@ contract BountyExchange {
         // Settle bounty funds
         IERC20(bountyRequest.bountyToken).transferFrom(
             msg.sender,
+            address(this),
+            approvedBountyAmount
+        );
+
+        IERC20(bountyRequest.stolenToken).transfer(
             bountyRequest.bountyReceiver,
             approvedBountyAmount
         );
