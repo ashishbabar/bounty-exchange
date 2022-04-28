@@ -5,10 +5,13 @@ import "hardhat/console.sol";
 import "@openzeppelin/contracts/utils/Timers.sol";
 import "@openzeppelin/contracts/utils/math/SafeCast.sol";
 
-/// @title A title that should describe the contract/interface
+/// @title BountyExchange is contract that settles exchange of stolen tokens and bounty
+/// within untrusted parties
 /// @author ashishbabar
-/// @notice Explain to an end user what this does
-/// @dev Explain to a developer any extra details
+/// @notice This contract has functionalities that provides secure and trustworthy way
+/// to exchange stolen tokens with bounty
+/// TODO: Need to restrict access to submitBounty to deployer wallet of stolen tokens.
+/// SA will check wallet address of deployer and will provide this address at the time of raising bounty request.
 contract BountyExchange {
     using Timers for Timers.Timestamp;
     using SafeCast for uint256;
@@ -74,6 +77,7 @@ contract BountyExchange {
     }
 
     // This function is expecting that security analyst have already allowed tokens to this contract.
+    // TODO: similar type parameters needs to be clubbed together.
     function requestBounty(
         uint256 stolenAmount,
         address stolenToken,
@@ -112,6 +116,7 @@ contract BountyExchange {
         bountyRequest.bountyProcessed = false;
         bountyRequest.expirationTimestamp.setDeadline(expirationTimestamp);
 
+        // Get funds from SAs allowance to contract
         IERC20(stolenToken).transferFrom(
             msg.sender,
             address(this),
@@ -144,14 +149,15 @@ contract BountyExchange {
             "Insufficient allowance"
         );
 
-        // Settle bounty funds
+        // Transfer funds from Bounty providers allowance to contract
         IERC20(bountyRequest.bountyToken).transferFrom(
             msg.sender,
             address(this),
             approvedBountyAmount
         );
 
-        IERC20(bountyRequest.stolenToken).transfer(
+        // Transfer funds from contract to bounty requester
+        IERC20(bountyRequest.bountyToken).transfer(
             bountyRequest.bountyReceiver,
             approvedBountyAmount
         );
@@ -161,10 +167,59 @@ contract BountyExchange {
             msg.sender,
             bountyRequest.stolenAmount
         );
+
         // Mark this request as processed.
         bountyRequest.bountyProcessed = true;
 
         emit SubmitBounty(bountyRequestID, bountyRequest.bountyProcessed);
         return bountyRequest.bountyProcessed;
+    }
+
+    // This function is for SA to claim tokens from expired bounty request
+    function claimTokensFromExpiredBounty(uint256 bountyRequestID)
+        public
+        returns (bool)
+    {
+        BountyRequest storage bountyRequest = bountyRequests[bountyRequestID];
+
+        // Check if caller has requested bounty request
+        require(bountyRequest.bountyReceiver == msg.sender, "Not allowed");
+
+        // Check if bounty is expired
+        require(
+            block.timestamp.toUint64() >
+                bountyRequest.expirationTimestamp.getDeadline(),
+            "Bounty is not expired"
+        );
+
+        // Tranfer stolen tokens back to requester
+        IERC20(bountyRequest.stolenToken).transfer(
+            msg.sender,
+            bountyRequest.stolenAmount
+        );
+
+        return true;
+    }
+
+    // This function checks if bountyRequest is expired
+    function isBountyExpired(uint256 bountyRequestID)
+        public
+        view
+        returns (bool)
+    {
+        BountyRequest storage bountyRequest = bountyRequests[bountyRequestID];
+        return
+            block.timestamp.toUint64() >
+            bountyRequest.expirationTimestamp.getDeadline();
+    }
+
+    // This function fetches deadline of bounty request
+    function getBountyDeadline(uint256 bountyRequestID)
+        public
+        view
+        returns (uint64)
+    {
+        BountyRequest storage bountyRequest = bountyRequests[bountyRequestID];
+        return bountyRequest.expirationTimestamp.getDeadline();
     }
 }

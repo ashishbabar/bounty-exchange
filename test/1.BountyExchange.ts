@@ -1,6 +1,6 @@
 import { expect } from "chai";
 import { BigNumber, ContractReceipt } from "ethers";
-import { ethers } from "hardhat";
+import { ethers, network } from "hardhat";
 import { Contract, ContractFactory, Signer } from "ethers";
 
 describe("BountyExchange", function () {
@@ -46,13 +46,17 @@ describe("BountyExchange", function () {
       .connect(bountyRequester)
       .approve(BountyExchange.address, stolenAmount);
 
+    // Create 1 day duration bignumber object
+    const durationBigNumber = BigNumber.from("86400");
+
     const requestBountyResponse = await BountyExchange.connect(
       bountyRequester
     ).requestBounty(
       stolenAmount,
       stolenToken.address,
       bountyAmount,
-      bountyToken.address
+      bountyToken.address,
+      durationBigNumber
     );
 
     const requestBountyReceipt: ContractReceipt =
@@ -99,12 +103,48 @@ describe("BountyExchange", function () {
     expect(bountyProviderBalance).to.equals(stolenAmount);
 
     // Check if bounty request is processed.
-    bountyRequest = await BountyExchange.getBountyRequest(bountyRequest);
-    expect(bountyRequest[5]).to.equal(true);
+    const bountyRequestResponse = await BountyExchange.getBountyRequest(
+      bountyRequest
+    );
+    expect(bountyRequestResponse[5]).to.equal(true);
 
     // Check event emitted
-    console.log('events :>> ', events);
-    const bountySubmissionEvent = events ? events[0].args : "";
-    console.log('bountySubmissionEvent :>> ', bountySubmissionEvent);
+  });
+
+  it("Should detect expired bounty request", async function () {
+    const bountyDeadline = await BountyExchange.getBountyDeadline(
+      bountyRequest
+    );
+    const currentTimestamp = Math.round(new Date().getTime() / 1000);
+
+    await network.provider.send("evm_increaseTime", [
+      bountyDeadline.toNumber() - currentTimestamp,
+    ]);
+    await network.provider.send("evm_mine");
+
+    const isBountyExpired = await BountyExchange.isBountyExpired(bountyRequest);
+    expect(isBountyExpired).to.equals(true);
+  });
+
+  it("Should claim tokens from expired bounty request", async function () {
+    const [, bountyRequester] = await ethers.getSigners();
+    const bountyDeadline = await BountyExchange.getBountyDeadline(
+      bountyRequest
+    );
+    const currentTimestamp = Math.round(new Date().getTime() / 1000);
+
+    await network.provider.send("evm_increaseTime", [
+      bountyDeadline.toNumber() - currentTimestamp,
+    ]);
+    await network.provider.send("evm_mine");
+
+    await BountyExchange.connect(bountyRequester).claimTokensFromExpiredBounty(
+      bountyRequest
+    );
+
+    const bountyRequesterBalance = await stolenToken.balanceOf(
+      bountyRequester.address
+    );
+    expect(bountyRequesterBalance).to.equal(stolenAmount);
   });
 });
