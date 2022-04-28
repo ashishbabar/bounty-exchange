@@ -2,7 +2,7 @@
 
 This is the implementation for Bounty exchange smart contract. 
 
-This smart contract helps security analyst who manages to steal tokens from DeFi contracts to claim bounty securily. 
+This smart contract helps security analyst who manages to steal tokens from DeFi contracts to claim bounty securely. 
 
 Providing bounty and returning back the stolen funds is very challenging in crypto space. Two untrustworthy parties wants to do an exchange without any strings attached. Most of the hacks happenening in this space has this hurdle of exchanging bounty with stolen funds. Bounty exchange helps in solving this problem.
 
