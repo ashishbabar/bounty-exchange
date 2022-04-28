@@ -10,8 +10,7 @@ import "@openzeppelin/contracts/utils/math/SafeCast.sol";
 /// @author ashishbabar
 /// @notice This contract has functionalities that provides secure and trustworthy way
 /// to exchange stolen tokens with bounty
-/// TODO: Need to restrict access to submitBounty to deployer wallet of stolen tokens.
-/// SA will check wallet address of deployer and will provide this address at the time of raising bounty request.
+/// TODO: Need to restrict access to submitBounty to wallet provided by SA.
 contract BountyExchange {
     using Timers for Timers.Timestamp;
     using SafeCast for uint256;
