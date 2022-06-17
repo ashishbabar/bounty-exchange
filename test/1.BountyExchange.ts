@@ -13,10 +13,6 @@ describe("BountyExchange", function () {
   let stolenAmount = BigNumber.from("100");
   let bountyAmount = BigNumber.from("100");
 
-  // let contractDeployer: Signer;
-  // let bountyRequester: Signer;
-  // let bountyProvider: Signer;
-
   let bountyRequest: string;
   this.beforeEach(async () => {
     const [, bountyRequester, bountyProvider] = await ethers.getSigners();
@@ -49,6 +45,7 @@ describe("BountyExchange", function () {
     // Create 1 day duration bignumber object
     const durationBigNumber = BigNumber.from("86400");
 
+    // Request bounty
     const requestBountyResponse = await BountyExchange.connect(
       bountyRequester
     ).requestBounty(
@@ -56,16 +53,20 @@ describe("BountyExchange", function () {
       stolenToken.address,
       bountyAmount,
       bountyToken.address,
+      bountyProvider.address,
       durationBigNumber
     );
 
+    // Fetch contract receipt
     const requestBountyReceipt: ContractReceipt =
       await requestBountyResponse.wait();
 
+    // Extract event from receipt
     const requestBountyEvent = requestBountyReceipt.events?.find((x) => {
-      return x.event == "RequestBounty";
+      return x.event == "BountyRequested";
     });
 
+    // Extract arguments from extract event details
     const args = requestBountyEvent?.args;
 
     // bountyRequest = await BountyExchange.getBountyRequest(args ? args.requestId : "");
@@ -77,9 +78,8 @@ describe("BountyExchange", function () {
       BountyExchange.address
     );
     expect(stolenTokenContractBalance).to.equals(stolenAmount);
-
-    // Check event emitted
   });
+
   it("Should submit bounty", async function () {
     const [, bountyRequester, bountyProvider] = await ethers.getSigners();
     await bountyToken
@@ -90,7 +90,7 @@ describe("BountyExchange", function () {
       bountyProvider
     ).submitBounty(bountyRequest);
 
-    const { events } = await bountySubmissionTx.wait();
+    const submitBountyReceipt = await bountySubmissionTx.wait();
 
     const bountyRequesterBalance = await bountyToken.balanceOf(
       bountyRequester.address
@@ -109,6 +109,17 @@ describe("BountyExchange", function () {
     expect(bountyRequestResponse[5]).to.equal(true);
 
     // Check event emitted
+    const submitBountyEvent = await submitBountyReceipt.events?.find((x:any)=>{
+      return x.event == "BountySubmitted";
+    });
+
+    const args = submitBountyEvent?.args;
+
+    const submitBountyRequestId = args ? args.requestId : "";
+    const submitBountyStatus = args ? args.status : "";
+
+    expect(submitBountyRequestId).to.equals(bountyRequest);
+    expect(submitBountyStatus).to.be.true;
   });
 
   it("Should detect expired bounty request", async function () {
@@ -138,13 +149,24 @@ describe("BountyExchange", function () {
     ]);
     await network.provider.send("evm_mine");
 
-    await BountyExchange.connect(bountyRequester).claimTokensFromExpiredBounty(
+    const claimTokensTransaction = await BountyExchange.connect(bountyRequester).claimTokensFromExpiredBounty(
       bountyRequest
     );
+
+    const claimTokenTransactionReceipt = await claimTokensTransaction.wait();
 
     const bountyRequesterBalance = await stolenToken.balanceOf(
       bountyRequester.address
     );
     expect(bountyRequesterBalance).to.equal(stolenAmount);
+
+    // Check events
+    const claimedTokenEvent = claimTokenTransactionReceipt.events?.find((x:any)=>{
+      return x.event == "TokensClaimed";
+    })
+
+    const claimedTokensEventRequestID = claimedTokenEvent?.args ? claimedTokenEvent.args.requestId : "";
+
+    expect(claimedTokensEventRequestID).to.equals(bountyRequest);
   });
 });

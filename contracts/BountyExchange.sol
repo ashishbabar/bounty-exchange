@@ -21,13 +21,15 @@ contract BountyExchange {
         address stolenToken;
         address bountyToken;
         address bountyReceiver;
+        address bountyProvider;
         bool bountyProcessed;
         Timers.Timestamp expirationTimestamp;
     }
     mapping(uint256 => BountyRequest) public bountyRequests;
 
-    event RequestBounty(uint256 requestId);
-    event SubmitBounty(uint256 requestId, bool status);
+    event BountyRequested(uint256 requestId);
+    event BountySubmitted(uint256 requestId, bool status);
+    event TokensClaimed(uint256 requestId);
 
     constructor() {}
 
@@ -82,6 +84,7 @@ contract BountyExchange {
         address stolenToken,
         uint256 bountyAmount,
         address bountyToken,
+        address bountyProvider,
         uint256 duration
     ) public returns (uint256) {
         // TODO Check if stolenToken and bountyToken are ERC20 tokens.
@@ -112,6 +115,7 @@ contract BountyExchange {
         bountyRequest.bountyAmount = bountyAmount;
         bountyRequest.bountyToken = bountyToken;
         bountyRequest.bountyReceiver = msg.sender;
+        bountyRequest.bountyProvider = bountyProvider;
         bountyRequest.bountyProcessed = false;
         bountyRequest.expirationTimestamp.setDeadline(expirationTimestamp);
 
@@ -121,7 +125,7 @@ contract BountyExchange {
             address(this),
             stolenAmount
         );
-        emit RequestBounty(requestID);
+        emit BountyRequested(requestID);
 
         return requestID;
     }
@@ -130,6 +134,9 @@ contract BountyExchange {
     // This also indicates that bounty provider have agreed to terms and have approved requested bounty to contract
     function submitBounty(uint256 bountyRequestID) public returns (bool) {
         BountyRequest storage bountyRequest = bountyRequests[bountyRequestID];
+
+        // Check if msg.sender is bounty provider
+        require(bountyRequest.bountyProvider == msg.sender, "Not allowed");
 
         // Check if bounty request is expired
         require(
@@ -170,7 +177,7 @@ contract BountyExchange {
         // Mark this request as processed.
         bountyRequest.bountyProcessed = true;
 
-        emit SubmitBounty(bountyRequestID, bountyRequest.bountyProcessed);
+        emit BountySubmitted(bountyRequestID, bountyRequest.bountyProcessed);
         return bountyRequest.bountyProcessed;
     }
 
@@ -196,6 +203,9 @@ contract BountyExchange {
             msg.sender,
             bountyRequest.stolenAmount
         );
+
+        // Emit event
+        emit TokensClaimed(bountyRequestID);
 
         return true;
     }
