@@ -6,15 +6,24 @@
 import { ethers } from "hardhat";
 
 async function main() {
-  // Hardhat always runs the compile task when running scripts with its command
-  // line interface.
-  //
-  // If this script is run directly using `node` you may want to call compile
-  // manually to make sure everything is compiled
-  // await hre.run('compile');
-
+  // Deploy token contracts
+  const TokenFactory = await ethers.getContractFactory("MyToken");
+  const bountyToken = await TokenFactory.deploy(
+    "Tether USD",
+    "USDT",
+    "1000000000000000000000"
+  );
+  const stolenToken = await TokenFactory.deploy(
+    "W Token",
+    "WTOK",
+    "1000000000000000000000"
+  );
+  console.log("bountyToken :>> ", bountyToken.address);
+  console.log("stolenToken :>> ", stolenToken.address);
   // We get the contract to deploy
-  const BountyExchangeFactory = await ethers.getContractFactory("BountyExchange");
+  const BountyExchangeFactory = await ethers.getContractFactory(
+    "BountyExchange"
+  );
   const bountyExchange = await BountyExchangeFactory.deploy();
 
   await bountyExchange.deployed();
